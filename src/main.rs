@@ -2,7 +2,7 @@ use regex::Regex;
 use std::{collections::HashSet, env, fs::File, io::Read, path::Path, process::Command};
 use tree_sitter::{Parser, Point, Tree};
 
-fn diff(path: &Path) -> Vec<usize> {
+fn diff(path: &Path) -> HashSet<usize> {
     let diff = Command::new("git")
         .arg("diff")
         .arg("@~..@")
@@ -53,8 +53,10 @@ fn main() {
     let tree = parser.parse(&source, None).unwrap();
 
     let comments: HashSet<Point> = lines
-        .into_iter()
-        .flat_map(|line| comments(&tree, Point::new(line, 0)))
+        .iter()
+        .flat_map(|line| comments(&tree, Point::new(*line, 0)))
         .collect();
-    println!("{comments:#?}")
+
+    let comments_lines: HashSet<usize> = comments.iter().map(|point| point.row).collect();
+    println!("{:#?}", comments_lines.difference(&lines));
 }
