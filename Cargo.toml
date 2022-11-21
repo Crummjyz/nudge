@@ -7,4 +7,5 @@ edition = "2021"
 
 [dependencies]
 tree-sitter = "0.20"
+tree-sitter-swift = "0.3"
 regex = "1.7"
