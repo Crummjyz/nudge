@@ -1,5 +1,6 @@
 use regex::Regex;
-use std::{env, path::Path, process::Command};
+use std::{collections::HashSet, env, fs::File, io::Read, path::Path, process::Command};
+use tree_sitter::{Parser, Point, Tree};
 
 fn diff(path: &Path) -> Vec<usize> {
     let diff = Command::new("git")
@@ -19,8 +20,41 @@ fn diff(path: &Path) -> Vec<usize> {
         .collect();
 }
 
+fn comments(tree: &Tree, point: Point) -> Vec<Point> {
+    let mut cursor = tree.walk();
+    let mut comments = Vec::new();
+    loop {
+        let node = cursor.node();
+        if ["class_declaration", "function_declaration"].contains(&node.kind()) {
+            let comment = cursor.node().prev_named_sibling().unwrap();
+            // TODO: Check that we do, in fact, have a comment.
+            // TODO: Check for start/end of multiline comments.
+            comments.push(comment.start_position());
+        }
+
+        cursor.goto_first_child_for_point(point);
+        if cursor.node() == node {
+            break;
+        }
+    }
+    return comments;
+}
+
 fn main() {
     let path = Path::new(&env::args().nth(1).unwrap()).to_owned();
     let lines = diff(&path);
-    println!("{lines:?}")
+
+    let mut file = File::open(path).unwrap();
+    let mut source = String::new();
+    file.read_to_string(&mut source).unwrap();
+
+    let mut parser = Parser::new();
+    parser.set_language(tree_sitter_swift::language()).unwrap();
+    let tree = parser.parse(&source, None).unwrap();
+
+    let comments: HashSet<Point> = lines
+        .into_iter()
+        .flat_map(|line| comments(&tree, Point::new(line, 0)))
+        .collect();
+    println!("{comments:#?}")
 }
