@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 tree-sitter = "0.20"
+regex = "1.7"
