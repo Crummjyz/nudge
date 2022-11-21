@@ -2,6 +2,16 @@ use regex::Regex;
 use std::{collections::HashSet, env, fs::File, io::Read, path::Path, process::Command};
 use tree_sitter::{Parser, Point, Tree};
 
+const KINDS: [&str; 7] = [
+    "variable_declaration",
+    "function_declaration",
+    "enum_declaration",
+    "struct_declaration",
+    "class_declaration",
+    "protocol_declaration",
+    "initializer_declaration",
+];
+
 fn diff(path: &Path) -> HashSet<usize> {
     let diff = Command::new("git")
         .arg("diff")
@@ -25,11 +35,12 @@ fn comments(tree: &Tree, point: Point) -> Vec<Point> {
     let mut comments = Vec::new();
     loop {
         let node = cursor.node();
-        if ["class_declaration", "function_declaration"].contains(&node.kind()) {
-            let comment = cursor.node().prev_named_sibling().unwrap();
-            // TODO: Check that we do, in fact, have a comment.
+        if KINDS.contains(&node.kind()) {
             // TODO: Check for start/end of multiline comments.
-            comments.push(comment.start_position());
+            let comment = cursor.node().prev_named_sibling().unwrap();
+            if comment.kind() == "comment" {
+                comments.push(comment.start_position());
+            }
         }
 
         cursor.goto_first_child_for_point(point);
