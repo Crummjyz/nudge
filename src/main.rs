@@ -1,5 +1,13 @@
 use regex::Regex;
-use std::{collections::HashSet, env, fs::File, io::Read, path::Path, process::Command};
+use std::{
+    collections::HashSet,
+    env,
+    ffi::OsStr,
+    fs::{self, File},
+    io::Read,
+    path::{Path, PathBuf},
+    process::Command,
+};
 use tree_sitter::{Parser, Point, Tree};
 
 const KINDS: [&str; 7] = [
@@ -51,9 +59,8 @@ fn comments(tree: &Tree, point: Point) -> Vec<Point> {
     return comments;
 }
 
-fn main() {
-    let path = Path::new(&env::args().nth(1).unwrap()).to_owned();
-    let lines = diff(&path);
+fn find(path: &Path) {
+    let lines = diff(path);
 
     let mut file = File::open(path).unwrap();
     let mut source = String::new();
@@ -69,5 +76,31 @@ fn main() {
         .collect();
 
     let comments_lines: HashSet<usize> = comments.iter().map(|point| point.row).collect();
-    println!("{:#?}", comments_lines.difference(&lines));
+    for line in comments_lines.difference(&lines) {
+        println!(
+            "::warning file={},line={line}::Posssibly outdated comment",
+            path.display(),
+        );
+    }
+}
+
+fn find_recursively(path: &Path) {
+    if path.is_dir() {
+        for entry in fs::read_dir(path).unwrap() {
+            let path = entry.unwrap().path();
+            find_recursively(&path);
+        }
+    } else if path.extension() == Some(OsStr::new("swift")) {
+        find(&path)
+    }
+}
+
+fn main() {
+    let paths: Vec<PathBuf> = env::args()
+        .skip(1)
+        .map(|arg| Path::new(&arg).to_owned())
+        .collect();
+    for path in paths {
+        find_recursively(&path);
+    }
 }
