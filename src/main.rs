@@ -35,18 +35,26 @@ fn diff(path: &Path) -> HashSet<usize> {
         .arg("@~..@")
         .arg("--unified=0")
         .arg(path)
-        .current_dir(path.parent().expect("path should have a parent"))
+        .current_dir(path.parent().expect("file should be in a git repo"))
         .output()
         .expect("failed to execute git diff");
-    let output = String::from_utf8(diff.stdout).expect("stdout should be utf-8");
+    let output = String::from_utf8(diff.stdout).expect("diff should be utf-8");
 
-    let regex = regex!(r"(?m)^@@ \-\d+(?:,\d+)* \+(\d+)(?:,\d+)* @@");
+    let regex = regex!(r"(?m)^@@ \-\d+(?:,\d+)* \+(\d+)(?:,(\d+))* @@");
     let captures = regex.captures_iter(&output);
     return captures
-        .map(|capture| {
-            capture[1]
-                .parse::<usize>()
-                .expect("capture should be a line number")
+        .flat_map(|capture| {
+            let start = capture
+                .get(1)
+                .unwrap()
+                .as_str()
+                .parse()
+                .expect("should match a line number");
+            let len = capture
+                .get(2)
+                .and_then(|x| x.as_str().parse().ok())
+                .unwrap_or(1);
+            return start..(start + len - 1);
         })
         .collect();
 }
