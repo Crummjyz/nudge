@@ -59,9 +59,11 @@ fn diff(path: &Path) -> HashSet<usize> {
         .collect();
 }
 
-fn comments(tree: &Tree, point: Point) -> Vec<Point> {
+fn comments(tree: &Tree, line: usize) -> HashSet<usize> {
+    let point = Point::new(line - 1, 0);
+
     let mut cursor = tree.walk();
-    let mut comments = Vec::new();
+    let mut comments = HashSet::new();
     loop {
         let node = cursor.node();
         if KINDS.contains(&node.kind()) {
@@ -71,7 +73,7 @@ fn comments(tree: &Tree, point: Point) -> Vec<Point> {
                 .prev_named_sibling()
                 .filter(|sibling| sibling.kind() == "comment")
             {
-                comments.push(comment.start_position());
+                comments.insert(comment.start_position().row + 1);
             }
         }
         cursor.goto_first_child_for_point(point);
@@ -96,13 +98,12 @@ fn find(path: &Path) {
         .parse(&source, None)
         .expect("source code should parse");
 
-    let comments: HashSet<Point> = lines
+    let comments: HashSet<usize> = lines
         .iter()
-        .flat_map(|line| comments(&tree, Point::new(*line, 0)))
+        .flat_map(|line| comments(&tree, *line))
         .collect();
 
-    let comments_lines: HashSet<usize> = comments.iter().map(|point| point.row).collect();
-    for line in comments_lines.difference(&lines) {
+    for line in comments.difference(&lines) {
         warn!("Possible stale comment", path.display(), line);
     }
 }
