@@ -54,7 +54,7 @@ fn diff(path: &Path) -> HashSet<usize> {
                 .get(2)
                 .and_then(|x| x.as_str().parse().ok())
                 .unwrap_or(1);
-            return start..(start + len - 1);
+            return start..(start + len);
         })
         .collect();
 }
