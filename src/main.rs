@@ -1,4 +1,4 @@
-use regex::Regex;
+use lazy_regex::regex;
 use std::{
     collections::HashSet,
     env,
@@ -40,7 +40,7 @@ fn diff(path: &Path) -> HashSet<usize> {
         .expect("failed to execute git diff");
     let output = String::from_utf8(diff.stdout).expect("stdout should be utf-8");
 
-    let regex = Regex::new(r"(?m)^@@ \-\d+(?:,\d+)* \+(\d+)(?:,\d+)* @@").unwrap();
+    let regex = regex!(r"(?m)^@@ \-\d+(?:,\d+)* \+(\d+)(?:,\d+)* @@");
     let captures = regex.captures_iter(&output);
     return captures
         .map(|capture| {
