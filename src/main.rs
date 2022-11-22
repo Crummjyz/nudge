@@ -104,7 +104,7 @@ fn find(path: &Path) {
         .collect();
 
     for line in comments.difference(&lines) {
-        warn!("Possible stale comment", path.display(), line);
+        warn!("Documentation may be stale", path.display(), line);
     }
 }
 
