@@ -5,10 +5,11 @@ use std::{
     ffi::OsStr,
     fs::{self, File},
     io::Read,
+    ops::Range,
     path::{Path, PathBuf},
     process::Command,
 };
-use tree_sitter::{Parser, Point, Tree};
+use tree_sitter::{Node, Parser, Point, Tree};
 
 macro_rules! warn {
     ($message:expr) => {
@@ -59,7 +60,7 @@ fn diff(path: &Path) -> HashSet<usize> {
         .collect();
 }
 
-fn comments(tree: &Tree, line: usize) -> HashSet<usize> {
+fn comments(tree: &Tree, line: usize) -> HashSet<Range<usize>> {
     let point = Point::new(line - 1, 0);
 
     let mut cursor = tree.walk();
@@ -67,13 +68,19 @@ fn comments(tree: &Tree, line: usize) -> HashSet<usize> {
     loop {
         let node = cursor.node();
         if KINDS.contains(&node.kind()) {
-            // TODO: Check for start/end of multiline comments.
-            if let Some(comment) = cursor
-                .node()
-                .prev_named_sibling()
-                .filter(|sibling| sibling.kind() == "comment")
-            {
-                comments.insert(comment.start_position().row + 1);
+            fn prev_comment(node: Node) -> Node {
+                return match node
+                    .prev_named_sibling()
+                    .filter(|sibling| sibling.kind() == "comment")
+                {
+                    Some(comment) => prev_comment(comment),
+                    None => node,
+                };
+            }
+
+            let start = prev_comment(node);
+            if start != node {
+                comments.insert((start.start_position().row + 1)..(node.start_position().row + 1));
             }
         }
         cursor.goto_first_child_for_point(point);
@@ -98,13 +105,15 @@ fn find(path: &Path) {
         .parse(&source, None)
         .expect("source code should parse");
 
-    let comments: HashSet<usize> = lines
+    let comments: HashSet<Range<usize>> = lines
         .iter()
         .flat_map(|line| comments(&tree, *line))
         .collect();
 
-    for line in comments.difference(&lines) {
-        warn!("Documentation may be stale", path.display(), line);
+    for comment in comments {
+        if !lines.iter().any(|line| comment.contains(line)) {
+            warn!("Documentation may be stale", path.display(), comment.start);
+        }
     }
 }
 
