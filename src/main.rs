@@ -21,16 +21,21 @@ macro_rules! warn {
 }
 
 trait Line {
+    fn new_with_line(line: usize) -> Point;
     fn line(&self) -> usize;
 }
 
 impl Line for Point {
+    fn new_with_line(line: usize) -> Point {
+        Point::new(line + 1, 0)
+    }
+
     fn line(&self) -> usize {
         self.row + 1
     }
 }
 
-const KINDS: [&str; 7] = [
+const DOCUMENTABLE_KINDS: [&str; 7] = [
     "variable_declaration",
     "function_declaration",
     "enum_declaration",
@@ -46,14 +51,19 @@ fn diff(path: &Path) -> HashSet<usize> {
         .arg("@~..@")
         .arg("--unified=0")
         .arg(path)
-        .current_dir(path.parent().expect("file should be in a git repo"))
+        .current_dir(
+            path.canonicalize()
+                .unwrap()
+                .parent()
+                .expect("file should be in a git repo"),
+        )
         .output()
         .expect("failed to execute git diff");
     let output = String::from_utf8(diff.stdout).expect("diff should be utf-8");
 
     let regex = regex!(r"(?m)^@@ \-\d+(?:,\d+)* \+(\d+)(?:,(\d+))* @@");
     let captures = regex.captures_iter(&output);
-    return captures
+    captures
         .flat_map(|capture| {
             let start = capture
                 .get(1)
@@ -63,29 +73,29 @@ fn diff(path: &Path) -> HashSet<usize> {
                 .expect("should match a line number");
             let len = capture
                 .get(2)
-                .and_then(|x| x.as_str().parse().ok())
+                .and_then(|m| m.as_str().parse().ok())
                 .unwrap_or(1);
-            return start..(start + len);
+            start..(start + len)
         })
-        .collect();
+        .collect()
 }
 
 fn comments(tree: &Tree, line: usize) -> HashSet<Range<usize>> {
-    let point = Point::new(line - 1, 0);
+    let point = Point::new_with_line(line);
 
     let mut cursor = tree.walk();
     let mut comments = HashSet::new();
     loop {
         let node = cursor.node();
-        if KINDS.contains(&node.kind()) {
+        if DOCUMENTABLE_KINDS.contains(&node.kind()) {
             fn prev_comment(node: Node) -> Node {
-                return match node
+                match node
                     .prev_named_sibling()
                     .filter(|sibling| sibling.kind() == "comment")
                 {
                     Some(comment) => prev_comment(comment),
                     None => node,
-                };
+                }
             }
 
             let start = prev_comment(node);
@@ -93,12 +103,13 @@ fn comments(tree: &Tree, line: usize) -> HashSet<Range<usize>> {
                 comments.insert((start.start_position().line())..(node.start_position().line()));
             }
         }
+
         cursor.goto_first_child_for_point(point);
         if cursor.node() == node {
             break;
         }
     }
-    return comments;
+    comments
 }
 
 fn find(path: &Path) {
@@ -144,12 +155,7 @@ fn find_recursively(path: &Path) {
 fn main() {
     let paths: Vec<PathBuf> = env::args()
         .skip(1)
-        .map(|arg| {
-            Path::new(&arg)
-                .canonicalize()
-                .expect("arg should be a valid path")
-                .to_owned()
-        })
+        .map(|arg| Path::new(&arg).to_owned())
         .collect();
     for path in paths {
         find_recursively(&path);
