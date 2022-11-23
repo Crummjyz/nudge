@@ -2,14 +2,13 @@ use lazy_regex::regex;
 use std::{
     collections::HashSet,
     env,
-    ffi::OsStr,
     fs::{self, File},
     io::Read,
     ops::Range,
     path::{Path, PathBuf},
     process::Command,
 };
-use tree_sitter::{Node, Parser, Point, Tree};
+use tree_sitter::{Language, Node, Parser, Point, Tree};
 
 macro_rules! warn {
     ($message:expr) => {
@@ -27,7 +26,7 @@ trait Line {
 
 impl Line for Point {
     fn new_with_line(line: usize) -> Point {
-        Point::new(line + 1, 0)
+        Point::new(line - 1, 0)
     }
 
     fn line(&self) -> usize {
@@ -35,28 +34,13 @@ impl Line for Point {
     }
 }
 
-const DOCUMENTABLE_KINDS: [&str; 7] = [
-    "variable_declaration",
-    "function_declaration",
-    "enum_declaration",
-    "struct_declaration",
-    "class_declaration",
-    "protocol_declaration",
-    "initializer_declaration",
-];
-
 fn diff(path: &Path) -> HashSet<usize> {
     let diff = Command::new("git")
         .arg("diff")
         .arg("@~..@")
         .arg("--unified=0")
         .arg(path)
-        .current_dir(
-            path.canonicalize()
-                .unwrap()
-                .parent()
-                .expect("file should be in a git repo"),
-        )
+        .current_dir(path.parent().expect("file should be in a git repo"))
         .output()
         .expect("failed to execute git diff");
     let output = String::from_utf8(diff.stdout).expect("diff should be utf-8");
@@ -87,21 +71,20 @@ fn comments(tree: &Tree, line: usize) -> HashSet<Range<usize>> {
     let mut comments = HashSet::new();
     loop {
         let node = cursor.node();
-        if DOCUMENTABLE_KINDS.contains(&node.kind()) {
-            fn prev_comment(node: Node) -> Node {
-                match node
-                    .prev_named_sibling()
-                    .filter(|sibling| sibling.kind() == "comment")
-                {
-                    Some(comment) => prev_comment(comment),
-                    None => node,
-                }
-            }
 
-            let start = prev_comment(node);
-            if start != node {
-                comments.insert((start.start_position().line())..(node.start_position().line()));
+        fn prev_comment(node: Node) -> Node {
+            match node
+                .prev_named_sibling()
+                .filter(|sibling| sibling.kind() == "comment")
+            {
+                Some(comment) => prev_comment(comment),
+                None => node,
             }
+        }
+
+        let start = prev_comment(node);
+        if start != node {
+            comments.insert((start.start_position().line())..(node.start_position().line()));
         }
 
         cursor.goto_first_child_for_point(point);
@@ -112,7 +95,7 @@ fn comments(tree: &Tree, line: usize) -> HashSet<Range<usize>> {
     comments
 }
 
-fn find(path: &Path) {
+fn find(path: &Path, language: Language) {
     let lines = diff(path);
 
     let mut file = File::open(path).expect("file should exist");
@@ -121,7 +104,7 @@ fn find(path: &Path) {
         .expect("file source should be readable");
 
     let mut parser = Parser::new();
-    parser.set_language(tree_sitter_swift::language()).unwrap();
+    parser.set_language(language).unwrap();
     let tree = parser
         .parse(&source, None)
         .expect("source code should parse");
@@ -146,8 +129,12 @@ fn find_recursively(path: &Path) {
             find_recursively(&path);
         }
     } else {
-        if path.extension() == Some(OsStr::new("swift")) {
-            find(&path)
+        if let Some(language) = match path.extension().and_then(|ext| ext.to_str()) {
+            Some("swift") => Some(tree_sitter_swift::language()),
+            Some("rs") => Some(tree_sitter_rust::language()),
+            _ => None,
+        } {
+            find(path, language)
         }
     }
 }
@@ -155,7 +142,12 @@ fn find_recursively(path: &Path) {
 fn main() {
     let paths: Vec<PathBuf> = env::args()
         .skip(1)
-        .map(|arg| Path::new(&arg).to_owned())
+        .map(|arg| {
+            Path::new(&arg)
+                .canonicalize()
+                .expect("arg should be a valid path")
+                .to_owned()
+        })
         .collect();
     for path in paths {
         find_recursively(&path);
