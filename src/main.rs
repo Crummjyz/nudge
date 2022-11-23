@@ -20,6 +20,16 @@ macro_rules! warn {
     };
 }
 
+trait Line {
+    fn line(&self) -> usize;
+}
+
+impl Line for Point {
+    fn line(&self) -> usize {
+        self.row + 1
+    }
+}
+
 const KINDS: [&str; 7] = [
     "variable_declaration",
     "function_declaration",
@@ -80,7 +90,7 @@ fn comments(tree: &Tree, line: usize) -> HashSet<Range<usize>> {
 
             let start = prev_comment(node);
             if start != node {
-                comments.insert((start.start_position().row + 1)..(node.start_position().row + 1));
+                comments.insert((start.start_position().line())..(node.start_position().line()));
             }
         }
         cursor.goto_first_child_for_point(point);
