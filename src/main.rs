@@ -59,7 +59,8 @@ fn diff(path: &Path, range: &String) -> HashSet<usize> {
             let len = capture
                 .get(2)
                 .and_then(|m| m.as_str().parse().ok())
-                .unwrap_or(1);
+                .unwrap_or(1)
+                .max(1);
             start..(start + len)
         })
         .collect()
