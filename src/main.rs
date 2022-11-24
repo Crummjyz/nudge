@@ -3,12 +3,12 @@ use lazy_regex::regex;
 use std::{
     collections::HashSet,
     fs::{self, File},
-    io::Read,
+    io::{self, Read},
     ops::Range,
     path::{Path, PathBuf},
     process::Command,
 };
-use tree_sitter::{Language, Node, Parser, Point, Tree};
+use tree_sitter::{Language, Node, Parser, Point, TreeCursor};
 
 macro_rules! warn {
     ($message:expr) => {
@@ -34,13 +34,14 @@ impl Line for Point {
     }
 }
 
-fn diff(path: &Path) -> HashSet<usize> {
+fn diff(path: &Path, range: &String) -> HashSet<usize> {
+    let path = &path.canonicalize().expect("path should exist");
     let diff = Command::new("git")
         .arg("diff")
-        .arg("@~..@")
-        .arg("--unified=0")
+        .arg("-U0")
+        .arg(range)
         .arg(path)
-        .current_dir(path.parent().expect("file should be in a git repo"))
+        .current_dir(path.parent().expect("path should be in a git repo"))
         .output()
         .expect("failed to execute git diff");
     let output = String::from_utf8(diff.stdout).expect("diff should be utf-8");
@@ -64,44 +65,34 @@ fn diff(path: &Path) -> HashSet<usize> {
         .collect()
 }
 
-fn comments(tree: &Tree, line: usize) -> HashSet<Range<usize>> {
-    let point = Point::new_with_line(line);
-
-    let mut cursor = tree.walk();
-    let mut comments = HashSet::new();
-    loop {
-        let node = cursor.node();
-
-        fn prev_comment(node: Node) -> Node {
-            match node
-                .prev_named_sibling()
+fn find_comments(cursor: &mut TreeCursor, point: Point) -> Vec<Range<usize>> {
+    if cursor.goto_first_child_for_point(point).is_some() {
+        fn leading_comment(node: Node) -> Node {
+            node.prev_named_sibling()
                 .filter(|sibling| sibling.kind() == "comment")
-            {
-                Some(comment) => prev_comment(comment),
-                None => node,
-            }
+                .map_or(node, leading_comment)
         }
 
-        let start = prev_comment(node);
-        if start != node {
-            comments.insert((start.start_position().line())..(node.start_position().line()));
+        let node = cursor.node();
+        let comment = leading_comment(cursor.node());
+        let mut comments = find_comments(cursor, point);
+        if node.kind() != "comment" && comment != node {
+            // TODO: it's inefficient to call leading_comment before the kind check.
+            let start = comment.start_position().line();
+            let end = node.start_position().line();
+            comments.push(start..end);
         }
-
-        cursor.goto_first_child_for_point(point);
-        if cursor.node() == node {
-            break;
-        }
+        comments
+    } else {
+        Vec::new()
     }
-    comments
 }
 
-fn find(path: &Path, language: Language) {
-    let lines = diff(path);
+fn check_file(path: &Path, range: &String, language: Language) -> Result<(), io::Error> {
+    let diff = diff(&path, &range);
 
-    let mut file = File::open(path).expect("file should exist");
     let mut source = String::new();
-    file.read_to_string(&mut source)
-        .expect("file source should be readable");
+    File::open(path)?.read_to_string(&mut source)?;
 
     let mut parser = Parser::new();
     parser.set_language(language).unwrap();
@@ -109,24 +100,24 @@ fn find(path: &Path, language: Language) {
         .parse(&source, None)
         .expect("source code should parse");
 
-    let comments: HashSet<Range<usize>> = lines
+    let comments: HashSet<Range<usize>> = diff
         .iter()
-        .flat_map(|line| comments(&tree, *line))
+        .flat_map(|line| find_comments(&mut tree.walk(), Point::new_with_line(*line)))
         .collect();
 
     for comment in comments {
-        if !lines.iter().any(|line| comment.contains(line)) {
+        if !diff.iter().any(|line| comment.contains(line)) {
             warn!("Documentation may be stale", path.display(), comment.start);
         }
     }
+
+    Ok(())
 }
 
-fn find_recursively(path: &Path) {
+fn check_recursively(path: &Path, range: &String) {
     if path.is_dir() {
-        for entry in fs::read_dir(path).expect("path should be a readable dir") {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            find_recursively(&path);
+        for entry in fs::read_dir(path).unwrap().flatten() {
+            check_recursively(&entry.path(), range);
         }
     } else {
         if let Some(language) = match path.extension().and_then(|ext| ext.to_str()) {
@@ -134,13 +125,14 @@ fn find_recursively(path: &Path) {
             Some("rs") => Some(tree_sitter_rust::language()),
             _ => None,
         } {
-            find(path, language)
+            check_file(path, range, language)
+                .unwrap_or_else(|err| eprintln!("Problem checking {}: {err}", path.display()));
         }
     }
 }
 
 fn main() {
-    let matches = App::new("Nudge")
+    let args = App::new("Nudge")
         .args([
             Arg::new("diff")
                 .short('d')
@@ -154,10 +146,10 @@ fn main() {
         ])
         .get_matches();
 
-    let diff: &String = matches.get_one("diff").expect("should default");
-    let paths: Vec<&PathBuf> = matches.get_many("path").expect("should default").collect();
+    let range: &String = args.get_one("diff").expect("should default");
+    let paths: Vec<&PathBuf> = args.get_many("path").expect("should default").collect();
 
     for path in paths {
-        find_recursively(&path);
+        check_recursively(path, range);
     }
 }
