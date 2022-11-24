@@ -14,8 +14,14 @@ macro_rules! warn {
     ($message:expr) => {
         println!("::warning::{}", $message);
     };
-    ($message:expr, $file:expr, $line:expr) => {
-        println!("::warning file={},line={}::{}", $file, $line, $message);
+    ($message:expr, $file:expr, $lines:expr) => {
+        println!(
+            "::warning file={},line={},endline={}::{}",
+            $file,
+            $lines.start,
+            $lines.end - 1,
+            $message
+        );
     };
 }
 
@@ -108,7 +114,7 @@ fn check_file(path: &Path, range: &String, language: Language) -> Result<(), io:
 
     for comment in comments {
         if !diff.iter().any(|line| comment.contains(line)) {
-            warn!("Documentation may be stale", path.display(), comment.start);
+            warn!("Documentation may be stale", path.display(), comment);
         }
     }
 
