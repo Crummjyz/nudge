@@ -1,7 +1,7 @@
+use clap::{Arg, Command as App};
 use lazy_regex::regex;
 use std::{
     collections::HashSet,
-    env,
     fs::{self, File},
     io::Read,
     ops::Range,
@@ -140,15 +140,23 @@ fn find_recursively(path: &Path) {
 }
 
 fn main() {
-    let paths: Vec<PathBuf> = env::args()
-        .skip(1)
-        .map(|arg| {
-            Path::new(&arg)
-                .canonicalize()
-                .expect("arg should be a valid path")
-                .to_owned()
-        })
-        .collect();
+    let matches = App::new("Nudge")
+        .args([
+            Arg::new("diff")
+                .short('d')
+                .value_name("RANGE")
+                .default_value("HEAD~")
+                .value_parser(clap::value_parser!(String)),
+            Arg::new("path")
+                .num_args(1..)
+                .default_value(".")
+                .value_parser(clap::value_parser!(PathBuf)),
+        ])
+        .get_matches();
+
+    let diff: &String = matches.get_one("diff").expect("should default");
+    let paths: Vec<&PathBuf> = matches.get_many("path").expect("should default").collect();
+
     for path in paths {
         find_recursively(&path);
     }
