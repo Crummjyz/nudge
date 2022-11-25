@@ -139,10 +139,14 @@ fn check_recursively(path: &Path, range: &String) {
 }
 
 fn main() {
-    let args = App::new("Nudge")
+    let args = App::new("nudge")
+        .about("Spot when implementations change, but docs don't.")
+        .author("Finn Eger <finn@fantail.dev>")
+        .version(env!("CARGO_PKG_VERSION"))
         .args([
             Arg::new("diff")
                 .short('d')
+                .help("Check a commit range")
                 .value_name("RANGE")
                 .default_value("HEAD~")
                 .value_parser(clap::value_parser!(String)),
