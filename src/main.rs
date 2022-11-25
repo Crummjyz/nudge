@@ -2,13 +2,14 @@ use clap::{Arg, Command as App};
 use lazy_regex::regex;
 use std::{
     collections::HashSet,
-    fs::{self, File},
-    io::{self, Read},
+    fs::File,
+    io::Read,
     ops::Range,
     path::{Path, PathBuf},
     process::Command,
 };
 use tree_sitter::{Language, Node, Parser, Point, TreeCursor};
+use walkdir::WalkDir;
 
 macro_rules! warn {
     ($message:expr) => {
@@ -95,7 +96,7 @@ fn find_comments(cursor: &mut TreeCursor, point: Point) -> Vec<Range<usize>> {
     }
 }
 
-fn check_file(path: &Path, range: &String, language: Language) -> Result<(), io::Error> {
+fn check_file(path: &Path, range: &String, language: Language) -> Result<(), std::io::Error> {
     let diff = diff(&path, &range);
 
     let mut source = String::new();
@@ -122,11 +123,9 @@ fn check_file(path: &Path, range: &String, language: Language) -> Result<(), io:
 }
 
 fn check_recursively(path: &Path, range: &String) {
-    if path.is_dir() {
-        for entry in fs::read_dir(path).unwrap().flatten() {
-            check_recursively(&entry.path(), range);
-        }
-    } else {
+    for entry in WalkDir::new(path) {
+        let entry = entry.unwrap();
+        let path = entry.path();
         if let Some(language) = match path.extension().and_then(|ext| ext.to_str()) {
             Some("swift") => Some(tree_sitter_swift::language()),
             Some("rs") => Some(tree_sitter_rust::language()),
