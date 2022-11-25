@@ -123,19 +123,24 @@ fn check_file(path: &Path, range: &String, language: Language) -> Result<(), std
 }
 
 fn check_recursively(path: &Path, range: &String) {
-    for entry in WalkDir::new(path) {
-        let entry = entry.unwrap();
-        let path = entry.path();
-        if let Some(language) = match path.extension().and_then(|ext| ext.to_str()) {
-            Some("swift") => Some(tree_sitter_swift::language()),
-            Some("rs") => Some(tree_sitter_rust::language()),
-            Some("go") => Some(tree_sitter_go::language()),
-            _ => None,
-        } {
-            check_file(path, range, language)
-                .unwrap_or_else(|err| eprintln!("Problem checking {}: {err}", path.display()));
+    rayon::scope(|scope| {
+        for entry in WalkDir::new(path) {
+            let entry = entry.unwrap();
+            let path = entry.path().to_owned();
+            if let Some(language) = match path.extension().and_then(|ext| ext.to_str()) {
+                Some("swift") => Some(tree_sitter_swift::language()),
+                Some("rs") => Some(tree_sitter_rust::language()),
+                Some("go") => Some(tree_sitter_go::language()),
+                _ => None,
+            } {
+                scope.spawn(move |_| {
+                    check_file(&path, range, language).unwrap_or_else(|err| {
+                        eprintln!("Problem checking {}: {err}", path.display())
+                    })
+                });
+            }
         }
-    }
+    });
 }
 
 fn main() {

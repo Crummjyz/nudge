@@ -9,6 +9,7 @@ license = "MIT"
 [dependencies]
 clap = "4.0"
 walkdir = "2.3"
+rayon = "1.6"
 regex = "1.7"
 lazy-regex = "2.3"
 tree-sitter = "0.20"
