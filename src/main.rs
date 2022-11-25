@@ -1,4 +1,4 @@
-use clap::{Arg, Command as App};
+use clap::{Arg, ArgAction, Command as App};
 use lazy_regex::regex;
 use std::{
     collections::HashSet,
@@ -7,9 +7,12 @@ use std::{
     ops::Range,
     path::{Path, PathBuf},
     process::Command,
+    sync::atomic::{AtomicBool, Ordering},
 };
 use tree_sitter::{Language, Node, Parser, Point, TreeCursor};
 use walkdir::WalkDir;
+
+static VERBOSE: AtomicBool = AtomicBool::new(false);
 
 macro_rules! warn {
     ($message:expr) => {
@@ -23,6 +26,14 @@ macro_rules! warn {
             $lines.end - 1,
             $message
         );
+    };
+}
+
+macro_rules! flag {
+    ($flag:expr, $action:expr) => {
+        if $flag.load(Ordering::Relaxed) {
+            $action
+        }
     };
 }
 
@@ -97,6 +108,7 @@ fn find_comments(cursor: &mut TreeCursor, point: Point) -> Vec<Range<usize>> {
 }
 
 fn check_file(path: &Path, range: &String, language: Language) -> Result<(), std::io::Error> {
+    flag!(VERBOSE, println!("Checking {}...", path.display()));
     let diff = diff(&path, &range);
 
     let mut source = String::new();
@@ -155,6 +167,10 @@ fn main() {
                 .value_name("RANGE")
                 .default_value("HEAD~")
                 .value_parser(clap::value_parser!(String)),
+            Arg::new("verbose")
+                .short('v')
+                .help("Increase verbosity")
+                .action(ArgAction::SetTrue),
             Arg::new("path")
                 .num_args(1..)
                 .default_value(".")
@@ -163,6 +179,7 @@ fn main() {
         .get_matches();
 
     let range: &String = args.get_one("diff").expect("should default");
+    VERBOSE.store(args.get_flag("verbose"), Ordering::Relaxed);
     let paths: Vec<&PathBuf> = args.get_many("path").expect("should default").collect();
 
     for path in paths {
