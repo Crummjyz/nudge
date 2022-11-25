@@ -130,6 +130,7 @@ fn check_recursively(path: &Path, range: &String) {
         if let Some(language) = match path.extension().and_then(|ext| ext.to_str()) {
             Some("swift") => Some(tree_sitter_swift::language()),
             Some("rs") => Some(tree_sitter_rust::language()),
+            Some("go") => Some(tree_sitter_go::language()),
             _ => None,
         } {
             check_file(path, range, language)
