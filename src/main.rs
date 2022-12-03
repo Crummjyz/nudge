@@ -93,13 +93,14 @@ fn find_comments(cursor: &mut TreeCursor, point: Point) -> Vec<Range<usize>> {
         }
 
         let node = cursor.node();
-        let comment = leading_comment(cursor.node());
         let mut comments = find_comments(cursor, point);
-        if node.kind() != "comment" && comment != node {
-            // TODO: it's inefficient to call leading_comment before the kind check.
-            let start = comment.start_position().line();
-            let end = node.start_position().line();
-            comments.push(start..end);
+        if node.kind() != "comment" {
+            let comment = leading_comment(node);
+            if comment != node {
+                let start = comment.start_position().line();
+                let end = node.start_position().line();
+                comments.push(start..end);
+            }
         }
         comments
     } else {
