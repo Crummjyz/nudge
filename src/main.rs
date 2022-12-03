@@ -64,7 +64,7 @@ fn diff(path: &Path, range: &String) -> HashSet<usize> {
         .expect("failed to execute git diff");
     let output = String::from_utf8(diff.stdout).expect("diff should be utf-8");
 
-    let regex = regex!(r"(?m)^@@ \-\d+(?:,\d+)* \+(\d+)(?:,(\d+))* @@");
+    let regex = regex!(r"(?m)^@@ \-\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@");
     let captures = regex.captures_iter(&output);
     captures
         .flat_map(|capture| {
