@@ -1,3 +1,5 @@
+mod macros;
+
 use clap::{Arg, ArgAction, Command as App};
 use lazy_regex::regex;
 use std::{
@@ -13,29 +15,6 @@ use tree_sitter::{Language, Node, Parser, Point, TreeCursor};
 use walkdir::WalkDir;
 
 static VERBOSE: AtomicBool = AtomicBool::new(false);
-
-macro_rules! warn {
-    ($message:expr) => {
-        println!("::warning::{}", $message);
-    };
-    ($message:expr, $file:expr, $lines:expr) => {
-        println!(
-            "::warning file={},line={},endline={}::{}",
-            $file,
-            $lines.start,
-            $lines.end - 1,
-            $message
-        );
-    };
-}
-
-macro_rules! flag {
-    ($flag:expr, $action:expr) => {
-        if $flag.load(Ordering::Relaxed) {
-            $action
-        }
-    };
-}
 
 trait Line {
     fn new_with_line(line: usize) -> Point;
@@ -110,7 +89,7 @@ fn find_comments(cursor: &mut TreeCursor, point: Point) -> Vec<Range<usize>> {
 
 fn check_file(path: &Path, range: &String, language: Language) -> Result<(), std::io::Error> {
     flag!(VERBOSE, println!("Checking {}...", path.display()));
-    let diff = diff(&path, &range);
+    let diff = diff(path, range);
 
     let mut source = String::new();
     File::open(path)?.read_to_string(&mut source)?;
@@ -140,12 +119,13 @@ fn check_recursively(path: &Path, range: &String) {
         for entry in WalkDir::new(path) {
             let entry = entry.unwrap();
             let path = entry.path().to_owned();
-            if let Some(language) = match path.extension().and_then(|ext| ext.to_str()) {
+            let language = match path.extension().and_then(|ext| ext.to_str()) {
                 Some("swift") => Some(tree_sitter_swift::language()),
                 Some("rs") => Some(tree_sitter_rust::language()),
                 Some("go") => Some(tree_sitter_go::language()),
                 _ => None,
-            } {
+            };
+            if let Some(language) = language {
                 scope.spawn(move |_| {
                     check_file(&path, range, language).unwrap_or_else(|err| {
                         eprintln!("Problem checking {}: {err}", path.display())
@@ -179,9 +159,12 @@ fn main() {
         ])
         .get_matches();
 
-    let range: &String = args.get_one("diff").expect("should default");
+    let range: &String = args.get_one("diff").expect("should have a default");
     VERBOSE.store(args.get_flag("verbose"), Ordering::Relaxed);
-    let paths: Vec<&PathBuf> = args.get_many("path").expect("should default").collect();
+    let paths: Vec<&PathBuf> = args
+        .get_many("path")
+        .expect("should have a default")
+        .collect();
 
     for path in paths {
         check_recursively(path, range);
