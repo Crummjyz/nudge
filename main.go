@@ -1,19 +1,14 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"strings"
 
 	"github.com/alexflint/go-arg"
 	"github.com/go-git/go-git/v5"
-	"github.com/go-git/go-git/v5/plumbing"
-	"github.com/go-git/go-git/v5/plumbing/format/diff"
-	sitter "github.com/smacker/go-tree-sitter"
-	"github.com/smacker/go-tree-sitter/c"
-	"github.com/smacker/go-tree-sitter/golang"
-	"github.com/smacker/go-tree-sitter/rust"
+
+	"fantail.dev/nudge/v2/internal"
 )
 
 type WarningFormat int
@@ -36,27 +31,11 @@ func (n *WarningFormat) UnmarshalText(b []byte) error {
 	return nil
 }
 
-type RevisionRange struct {
-	From, To plumbing.Revision
-}
-
-func (n *RevisionRange) UnmarshalText(b []byte) error {
-	s := string(b)
-	pos := strings.Index(s, "..")
-	if pos == -1 {
-		return fmt.Errorf("invalid revision range: %s", s)
-	}
-
-	n.From = plumbing.Revision(s[:pos])
-	n.To = plumbing.Revision(s[pos+2:])
-	return nil
-}
-
 func main() {
 	var args struct {
-		Path          string        `arg:"positional" default:"." help:"path to git repository"`
-		WarningFormat WarningFormat `arg:"--format" default:"default" help:"warning format"`
-		RevisionRange RevisionRange `arg:"--revision" default:"HEAD..HEAD~" help:"revision range"`
+		Path          string                 `arg:"positional" default:"." help:"path to git repository"`
+		WarningFormat WarningFormat          `arg:"--format" default:"default" help:"warning format"`
+		RevisionRange internal.RevisionRange `arg:"--revision" default:"HEAD..HEAD~" help:"revision range"`
 	}
 	arg.MustParse(&args)
 
@@ -65,10 +44,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	patches := patch(r, args.RevisionRange)
+	patches := internal.Diff(r, args.RevisionRange)
 	for _, patch := range patches {
-		content, changes := collect(patch.Chunks())
-		comments := sit(content, changes)
+		content, changes := internal.Collect(patch.Chunks())
+		comments := internal.Sit(content, changes)
 
 		for _, comment := range comments {
 			_, file := patch.Files()
@@ -81,85 +60,4 @@ func main() {
 			}
 		}
 	}
-}
-
-func patch(r *git.Repository, revisionRange RevisionRange) []diff.FilePatch {
-	from, err := r.ResolveRevision(revisionRange.From)
-	to, err := r.ResolveRevision(revisionRange.To)
-
-	f, err := r.CommitObject(*from)
-	t, err := r.CommitObject(*to)
-
-	patch, err := f.Patch(t)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	return patch.FilePatches()
-}
-
-func collect(chunks []diff.Chunk) (f []byte, changes [][2]int) {
-	pos := 0
-	for _, chunk := range chunks {
-		content := chunk.Content()
-		mode := chunk.Type()
-
-		switch mode {
-		case diff.Equal:
-			pos += len(content)
-			f = append(f, content...)
-		case diff.Add:
-			pos += len(content)
-			f = append(f, content...)
-			changes = append(changes, [2]int{pos, pos + len(content)})
-		case diff.Delete:
-			changes = append(changes, [2]int{pos, pos})
-		}
-	}
-
-	return
-}
-
-func sit(file []byte, changes [][2]int) []*sitter.Node {
-	langs := []*sitter.Language{rust.GetLanguage(), golang.GetLanguage(), c.GetLanguage()}
-
-	var n *sitter.Node
-	var err error
-	for _, lang := range langs {
-		n, err = sitter.ParseCtx(context.Background(), file, lang)
-		if err == nil {
-			break
-		}
-	}
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	comments := recurse(n, changes)
-	return comments
-}
-
-func recurse(node *sitter.Node, changes [][2]int) (comments []*sitter.Node) {
-	for i := 0; i < int(node.NamedChildCount()); i++ {
-		child := node.NamedChild(i)
-
-		subchanges := [][2]int{}
-		for _, change := range changes {
-			if overlap(change, [2]int{int(child.StartByte()), int(child.EndByte())}) {
-				subchanges = append(subchanges, change)
-			}
-		}
-
-		if len(subchanges) > 0 {
-			comments = append(comments, recurse(child, subchanges)...)
-		} else if child.Type() == "line_comment" {
-			comments = append(comments, child)
-		}
-	}
-
-	return
-}
-
-func overlap(a, b [2]int) bool {
-	return a[0] <= b[0] && b[0] <= a[1] || a[0] <= b[1] && b[1] <= a[1]
 }

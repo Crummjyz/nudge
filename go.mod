@@ -1,4 +1,4 @@
-module fantail.dev/gonudge/v2
+module fantail.dev/nudge/v2
 
 go 1.20
 
