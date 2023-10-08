@@ -8,6 +8,7 @@ import (
 
 	"github.com/alexflint/go-arg"
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/format/diff"
 	sitter "github.com/smacker/go-tree-sitter"
 	"github.com/smacker/go-tree-sitter/c"
@@ -35,10 +36,27 @@ func (n *WarningFormat) UnmarshalText(b []byte) error {
 	return nil
 }
 
+type RevisionRange struct {
+	From, To plumbing.Revision
+}
+
+func (n *RevisionRange) UnmarshalText(b []byte) error {
+	s := string(b)
+	pos := strings.Index(s, "..")
+	if pos == -1 {
+		return fmt.Errorf("invalid revision range: %s", s)
+	}
+
+	n.From = plumbing.Revision(s[:pos])
+	n.To = plumbing.Revision(s[pos+2:])
+	return nil
+}
+
 func main() {
 	var args struct {
 		Path          string        `arg:"positional" default:"." help:"path to git repository"`
 		WarningFormat WarningFormat `arg:"--format" default:"default" help:"warning format"`
+		RevisionRange RevisionRange `arg:"--revision" default:"HEAD..HEAD~" help:"revision range"`
 	}
 	arg.MustParse(&args)
 
@@ -47,31 +65,32 @@ func main() {
 		log.Fatal(err)
 	}
 
-	patch := patch(r)[0]
+	patches := patch(r, args.RevisionRange)
+	for _, patch := range patches {
+		content, changes := collect(patch.Chunks())
+		comments := sit(content, changes)
 
-	content, changes := collect(patch.Chunks())
-	comments := sit(content, changes)
-
-	for _, comment := range comments {
-		_, file := patch.Files()
-		path := file.Path()
-		switch args.WarningFormat {
-		case WarningFormat(DefaultWarningFormat):
-			fmt.Printf("%s:%d:%d: unchanged: %s\n", path, comment.StartPoint().Row+1, comment.StartPoint().Column+1, comment.Content(content))
-		case WarningFormat(GitHubWarningFormat):
-			fmt.Printf("::warning file=%s,line=%d,col=%d::%s\n", path, comment.StartPoint().Row+1, comment.StartPoint().Column+1, "comment unchanged")
+		for _, comment := range comments {
+			_, file := patch.Files()
+			path := file.Path()
+			switch args.WarningFormat {
+			case WarningFormat(DefaultWarningFormat):
+				fmt.Printf("%s:%d:%d: comment unchanged: %s\n", path, comment.StartPoint().Row+1, comment.StartPoint().Column+1, comment.Content(content))
+			case WarningFormat(GitHubWarningFormat):
+				fmt.Printf("::warning file=%s,line=%d,col=%d::%s\n", path, comment.StartPoint().Row+1, comment.StartPoint().Column+1, "comment unchanged")
+			}
 		}
 	}
 }
 
-func patch(r *git.Repository) []diff.FilePatch {
-	h, err := r.Head()
+func patch(r *git.Repository, revisionRange RevisionRange) []diff.FilePatch {
+	from, err := r.ResolveRevision(revisionRange.From)
+	to, err := r.ResolveRevision(revisionRange.To)
 
-	a, err := r.CommitObject(h.Hash())
-	b, err := a.Parent(0)
+	f, err := r.CommitObject(*from)
+	t, err := r.CommitObject(*to)
 
-	patch, err := a.Patch(b)
-
+	patch, err := f.Patch(t)
 	if err != nil {
 		log.Fatal(err)
 	}
