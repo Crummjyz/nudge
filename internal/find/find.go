@@ -1,8 +1,8 @@
-package internal
+package find
 
 import (
 	"context"
-	"log"
+	"errors"
 
 	sitter "github.com/smacker/go-tree-sitter"
 	"github.com/smacker/go-tree-sitter/c"
@@ -10,7 +10,8 @@ import (
 	"github.com/smacker/go-tree-sitter/rust"
 )
 
-func Sit(file []byte, changes [][2]int) []*sitter.Node {
+// FindComments finds all comments that apply to changed code, but have not themselves changed.
+func FindComments(file []byte, changes [][2]int) ([]*sitter.Node, error) {
 	langs := []*sitter.Language{rust.GetLanguage(), golang.GetLanguage(), c.GetLanguage()}
 
 	var n *sitter.Node
@@ -22,10 +23,10 @@ func Sit(file []byte, changes [][2]int) []*sitter.Node {
 		}
 	}
 	if err != nil {
-		log.Fatal(err)
+		return nil, errors.New("nudge: not a supported language")
 	}
 
-	return recurse(n, changes)
+	return recurse(n, changes), nil
 }
 
 func recurse(node *sitter.Node, changes [][2]int) (comments []*sitter.Node) {
@@ -49,6 +50,7 @@ func recurse(node *sitter.Node, changes [][2]int) (comments []*sitter.Node) {
 	return
 }
 
+// overlap reports whether the (ends-inclusive) ranges a and b overlap at all.
 func overlap(a, b [2]int) bool {
 	return a[0] <= b[0] && b[0] <= a[1] || a[0] <= b[1] && b[1] <= a[1]
 }
