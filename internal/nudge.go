@@ -44,7 +44,7 @@ func Nudge(r *git.Repository, revisions RevisionRange, ignoreHeaders bool) (warn
 			} else {
 				warnings = append(warnings, warning.Warning{
 					Path:    path,
-					Content: comment.Content(content),
+					Content: comment.Content(content) + "\n",
 					Start:   comment.StartPoint(),
 					End:     comment.EndPoint(),
 				})

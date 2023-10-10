@@ -13,7 +13,7 @@ import (
 type args struct {
 	Path          string                 `arg:"positional" default:"." help:"path to git repository"`
 	WarningFormat warning.WarningFormat  `arg:"--format" default:"default" help:"warning format"`
-	RevisionRange internal.RevisionRange `arg:"--revision" default:"HEAD..HEAD~" help:"revision range"`
+	RevisionRange internal.RevisionRange `arg:"--revisions" default:"HEAD..HEAD~" help:"revision range"`
 	IgnoreHeaders bool                   `arg:"--ignore-headers" default:"false" help:"ignore file header comments"`
 }
 
