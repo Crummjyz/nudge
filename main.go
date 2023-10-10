@@ -14,6 +14,7 @@ type args struct {
 	Path          string                 `arg:"positional" default:"." help:"path to git repository"`
 	WarningFormat warning.WarningFormat  `arg:"--format" default:"default" help:"warning format"`
 	RevisionRange internal.RevisionRange `arg:"--revision" default:"HEAD..HEAD~" help:"revision range"`
+	IgnoreHeaders bool                   `arg:"--ignore-headers" default:"false" help:"ignore file header comments"`
 }
 
 func (args) Description() string {
@@ -34,7 +35,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	warnings := internal.Nudge(r, args.RevisionRange)
+	warnings := internal.Nudge(r, args.RevisionRange, args.IgnoreHeaders)
 	for _, warning := range warnings {
 		warning.PrintWarning(args.WarningFormat)
 	}

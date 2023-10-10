@@ -8,7 +8,7 @@ import (
 	"github.com/go-git/go-git/v5"
 )
 
-func Nudge(r *git.Repository, revisions RevisionRange) (warnings []warning.Warning) {
+func Nudge(r *git.Repository, revisions RevisionRange, ignoreHeaders bool) (warnings []warning.Warning) {
 	patches, err := filePatches(r, revisions)
 	if err != nil {
 		log.Fatal(err)
@@ -48,6 +48,12 @@ func Nudge(r *git.Repository, revisions RevisionRange) (warnings []warning.Warni
 					Start:   comment.StartPoint(),
 					End:     comment.EndPoint(),
 				})
+			}
+		}
+
+		if ignoreHeaders {
+			for len(warnings) > 0 && warnings[0].Start.Row == 0 {
+				warnings = warnings[1:]
 			}
 		}
 	}
