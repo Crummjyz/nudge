@@ -14,7 +14,7 @@ func (w *Warning) PrintWarning(format WarningFormat) {
 		)
 	case WarningFormat(GitHubWarningFormat):
 		fmt.Printf(
-			"::warning file=%s,line=%d,col=%d,endLine=%d,endCol=%d::%s\n",
+			"::warning file=%s,line=%d,col=%d,endLine=%d,endColumn=%d::%s\n",
 			w.Path,
 			w.Start.Row+1,
 			w.Start.Column+1,
