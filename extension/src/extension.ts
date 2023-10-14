@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 
-const warningRegex = /^::warning file=([^\n]+),line=(\d+),col=(\d+),endLine=(\d+),endColumn=(\d+)::(.*)$/;
+const warningRegex = /^::notice file=([^\n]+),line=(\d+),col=(\d+),endLine=(\d+),endColumn=(\d+)::(.*)$/;
 
 export function activate(context: vscode.ExtensionContext) {
 	let active = false;
