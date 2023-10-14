@@ -9,13 +9,17 @@
   "categories": [
     "Other"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:go",
+    "onLanguage:rust",
+    "onLanguage:c"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "nudge.helloWorld",
-        "title": "Hello World"
+        "command": "nudge.checkWorkspace",
+        "title": "Toggle Nudge"
       }
     ]
   },

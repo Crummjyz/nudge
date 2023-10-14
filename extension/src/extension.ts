@@ -1,26 +1,91 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+const warningRegex = /^::warning file=([^\n]+),line=(\d+),col=(\d+),endLine=(\d+),endColumn=(\d+)::(.*)$/;
+
 export function activate(context: vscode.ExtensionContext) {
+	let active = false;
 
-	// Use the console to output diagnostic information (console.log) and errors (console.error)
-	// This line of code will only be executed once when your extension is activated
-	console.log('Congratulations, your extension "nudge" is now active!');
+	const diagnosticCollection = vscode.languages.createDiagnosticCollection('nudge');
 
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	let disposable = vscode.commands.registerCommand('nudge.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from Nudge!');
+	function checkWorkspace() {
+		const workspaceFolders = vscode.workspace.workspaceFolders
+		if (!workspaceFolders) {
+			return
+		}
+
+		for (const workspaceFolder of workspaceFolders) {
+			const workspacePath = workspaceFolder.uri.fsPath;
+
+			const process = require('child_process')
+			process.exec(`nudge ${workspacePath} --format=github`, (err: string, stdout: string, stderr: string) => {
+				if (err) {
+					return
+				}
+
+				diagnosticCollection.clear();
+
+				let fileDiagnostics: Map<string, vscode.Diagnostic[]> = new Map();
+
+				for (const warning of stdout.split("\n")) {
+					const matches = warning.match(warningRegex);
+
+					if (matches) {
+						const filePath = matches[1];
+						const message = matches[6];
+
+						const lineNumber = parseInt(matches[2]);
+						const columnNumber = parseInt(matches[3]);
+						const endLineNumber = parseInt(matches[4]);
+
+						for (let line = lineNumber; line <= endLineNumber; line++) {
+							const diagnostic = {
+								range: new vscode.Range(
+									line - 1,
+									columnNumber - 1,
+									line,
+									0,
+								),
+								message: message,
+								severity: vscode.DiagnosticSeverity.Information,
+								code: 'nudge'
+							};
+
+							let diagnostics = fileDiagnostics.get(filePath);
+							if (diagnostics) {
+								diagnostics.push(diagnostic);
+							} else {
+								fileDiagnostics.set(filePath, [diagnostic]);
+							}
+						}
+					}
+				}
+
+				for (const [filePath, diagnostics] of fileDiagnostics.entries()) {
+					diagnosticCollection.set(vscode.Uri.file(workspacePath + "/" + filePath), diagnostics);
+				}
+			});
+		}
+	}
+
+	vscode.workspace.onDidSaveTextDocument((textDocument) => {
+		if (active) {
+			const languageId = textDocument.languageId;
+			if (languageId === 'go' || languageId === 'rust' || languageId === 'c') {
+				checkWorkspace();
+			}
+		}
+	});
+
+	let disposable = vscode.commands.registerCommand('nudge.checkWorkspace', () => {
+		active = !active;
+		if (active) {
+			checkWorkspace();
+		} else {
+			diagnosticCollection.clear();
+		}
 	});
 
 	context.subscriptions.push(disposable);
 }
 
-// This method is called when your extension is deactivated
 export function deactivate() { }
