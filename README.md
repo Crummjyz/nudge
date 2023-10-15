@@ -1,18 +1,23 @@
-# nudge
+# Nudge
+_Spot when implementations change, but docs don't._
 
-Spot when implementations change, but docs don't.
+The `nudge` tool suggests documentation that might need review, based on changes to implementations.
 
-Running `nudge` with no arguments will check the current directory against `HEAD~`.
-Or, list files/directories to check, and specify a commit/range with `-d`.
+### Options
 
-Currently works with Swift, Rust, and Go source files, but could support any language with a
-[Tree Sitter parser](https://tree-sitter.github.io/tree-sitter/#parsers).
+Without any options, `nudge` checks the current repository's working tree against the latest commit.
+Alternatively, specify a revision range like `--revisions=main..branch`. Ignore file header comments
+with `--ignore-headers`. To use Nudge in GitHub Actions, pass the `--format=github` option. This
+annotates found docs in the GitHub file viewer.
 
-#### Check a PR with GitHub Actions
+Nudge can work with any language that has a [Tree
+Sitter](https://tree-sitter.github.io/tree-sitter/) grammar. Currently the following are
+implemented:
+- C
+- Go
+- Rust
 
-```yaml
-- name: Nudge
-  run: |
-    cargo install --git https://github.com/Crummjyz/nudge
-    nudge -d ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
-```
+### Visual Studio Code Extension
+
+Folders in your open workspace are checked when a supported file is saved, and info squiggles are
+added to relevant docs. Enable/disable linting with the 'Toggle Nudge' command.
