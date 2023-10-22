@@ -3,8 +3,8 @@ package internal
 import (
 	"log"
 
-	"fantail.dev/nudge/v2/internal/find"
-	"fantail.dev/nudge/v2/internal/warning"
+	"github.com/crummjyz/nudge/v2/internal/find"
+	"github.com/crummjyz/nudge/v2/internal/warning"
 	"github.com/go-git/go-git/v5"
 )
 

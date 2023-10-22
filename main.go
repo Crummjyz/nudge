@@ -6,8 +6,8 @@ import (
 	"github.com/alexflint/go-arg"
 	"github.com/go-git/go-git/v5"
 
-	"fantail.dev/nudge/v2/internal"
-	"fantail.dev/nudge/v2/internal/warning"
+	"github.com/crummjyz/nudge/v2/internal"
+	"github.com/crummjyz/nudge/v2/internal/warning"
 )
 
 type args struct {
