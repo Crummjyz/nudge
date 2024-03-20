@@ -1,6 +1,9 @@
 # Nudge
 _Spot when implementations change, but docs don't._
 
+[![Go Reference](https://pkg.go.dev/badge/github.com/crummjyz/nudge/v2.svg)](https://pkg.go.dev/github.com/crummjyz/nudge/v2)
+[![Go Report Card](https://goreportcard.com/badge/github.com/crummjyz/nudge/v2)](https://goreportcard.com/report/github.com/crummjyz/nudge/v2)
+
 The `nudge` tool suggests documentation that might need review, based on changes to implementations.
 It does this by looking at your Git commit history, parsing the files that have changed using [Tree
 Sitter](https://tree-sitter.github.io/tree-sitter/), and flagging doc comments where the code has
