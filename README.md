@@ -4,11 +4,11 @@ _Spot when implementations change, but docs don't._
 [![Go Reference](https://pkg.go.dev/badge/github.com/crummjyz/nudge/v2.svg)](https://pkg.go.dev/github.com/crummjyz/nudge/v2)
 [![Go Report Card](https://goreportcard.com/badge/github.com/crummjyz/nudge/v2)](https://goreportcard.com/report/github.com/crummjyz/nudge/v2)
 
-The `nudge` tool suggests documentation that might need review, based on changes to implementations.
+Nudge suggests documentation that might need review, based on changes to implementations.
 It does this by looking at your Git commit history, parsing the files that have changed using [Tree
 Sitter](https://tree-sitter.github.io/tree-sitter/), and flagging doc comments where the code has
-changed but the comment hasn't. `nudge` is designed to integrate nicely with CI pipelines and IDEs
-so that you never let your documentation get out of date.
+changed but the comment hasn't. Nudge is designed to integrate nicely with CI pipelines and IDEs so
+that you never let your documentation get out of date.
 
 ## Installation
 
@@ -27,7 +27,7 @@ Simply run `nudge` in your repository. It will check any changes that haven't be
 Without any options, `nudge` checks the current repository's working tree against the latest commit.
 Alternatively, specify a revision range like `--revisions=main..branch`. Ignore file header comments
 with `--ignore-headers`. To use Nudge in GitHub Actions, pass the `--format=github` option. This
-annotates found docs in the GitHub file viewer.
+annotates suggested docs in the GitHub file viewer.
 
 Nudge can work with any language that has a [Tree
 Sitter](https://tree-sitter.github.io/tree-sitter/) grammar. Currently the following are
