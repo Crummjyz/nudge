@@ -1,42 +1,26 @@
 # Nudge
 _Spot when implementations change, but docs don't._
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/crummjyz/nudge/v2.svg)](https://pkg.go.dev/github.com/crummjyz/nudge/v2)
-[![Go Report Card](https://goreportcard.com/badge/github.com/crummjyz/nudge/v2)](https://goreportcard.com/report/github.com/crummjyz/nudge/v2)
-
-Nudge suggests documentation that might need review, based on changes to implementations.
-It does this by looking at your Git commit history, parsing the files that have changed using [Tree
-Sitter](https://tree-sitter.github.io/tree-sitter/), and flagging doc comments where the code has
-changed but the comment hasn't. Nudge is designed to integrate nicely with CI pipelines and IDEs so
-that you never let your documentation get out of date.
-
-## Installation
-
-Download [Go](https://golang.org/dl/) and run:
-
-```sh
-go install github.com/crumjyz/nudge/v2@latest
-```
+Nudge suggests documentation that might need review based on changes to
+implementations. It does this by looking at your commit history, parsing the
+files with changes, and flagging unchanged comments on changed code. Nudge
+integrates nicely with CI pipelines and IDEs to make it easy to keep
+documentation up to date.
 
 ## Usage
 
-Simply run `nudge` in your repository. It will check any changes that haven't been staged or commited yet.
+Run `nudge` in your repository to check unstaged changes. Alternatively, specify
+a revision range like `--revisions=main..branch`. Ignore file header-comments
+with `--ignore-headers`. To use Nudge with GitHub Actions, pass the
+`--format=github` option, which will annotate suggestions in the GitHub file
+viewer.
 
-### Options
-
-Without any options, `nudge` checks the current repository's working tree against the latest commit.
-Alternatively, specify a revision range like `--revisions=main..branch`. Ignore file header comments
-with `--ignore-headers`. To use Nudge in GitHub Actions, pass the `--format=github` option. This
-annotates suggested docs in the GitHub file viewer.
-
-Nudge can work with any language that has a [Tree
-Sitter](https://tree-sitter.github.io/tree-sitter/) grammar. Currently the following are
-implemented:
-- C
-- Go
-- Rust
+Nudge can work on any language that has a
+[Tree-sitter](https://tree-sitter.github.io/tree-sitter/) grammar. Currently C,
+Go, and Rust are implemented.
 
 ## Visual Studio Code Extension
 
-Folders in your open workspace are checked when a supported file is saved, and info squiggles are
-added to relevant docs. Enable/disable linting with the 'Toggle Nudge' command.
+When a supported file is saved, the extension checks all changes in your
+workspace and adds info squiggles under relevant documentation. Enable/disable
+linting with the 'Toggle Nudge' command.
